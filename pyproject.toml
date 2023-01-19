@@ -1,0 +1,9 @@
+
+[project]
+name = "scons517"
+version = "0.0.1"
+dependencies = [
+    "SCons",
+    "packaging",
+    "toml",
+]

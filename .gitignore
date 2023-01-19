@@ -1,0 +1,5 @@
+.idea
+.sconsign.dblite
+dist
+build
+__pycache__
