@@ -151,7 +151,7 @@ def parse_pyproject_toml(file: str) -> PyProject:
     except KeyError:
         tool_metadata = {}
 
-    # Validate and normalize the name
+    # Validate the name
     name = project_metadata["name"]
     if not DIST_NAME_RE.match(name):
         raise UserError(
