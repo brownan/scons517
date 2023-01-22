@@ -24,6 +24,7 @@ import packaging.version
 import toml
 from SCons.Environment import Environment
 from SCons.Errors import UserError
+from SCons.Script import ARGUMENTS
 
 from scons517 import pytar
 
@@ -356,6 +357,7 @@ class Wheel:
 
         env.AddPostAction(self.target, _add_manifest)
         env.Clean(self.target, self.wheel_build_dir)
+        env.NoClean(self.target)
 
     def _add_zip_sources(self, sources):
         return self._zip_env.Zip(
@@ -443,51 +445,37 @@ def SDist(env: Environment, sources) -> List["Entry"]:
         TARPREFIX=dirname,
     )
     env.Clean(target, build_dir)
+    env.NoClean(target)
     return target
 
 
 def Editable(env, tag: str, src_root="."):
     """Returns a wheel built for installing an editable path
 
-    See PEP 662
-    https://peps.python.org/pep-0662/
+    See PEP 660
+    https://peps.python.org/pep-0660/
     """
     roots = env.arg2nodes(src_root, env.Dir)
     pyproject: PyProject = env["PYPROJECT"]
 
-    # Build the editable json structure
-    editable = {
-        "version": 1,
-        "scheme": {
-            "purelib": {},
-            "platlib": {},
-            "data": {},
-            "headers": {},
-            "scripts": {},
-        },
-    }
+    pthfile = ""
+    for source in roots:
+        abspath = source.get_abspath()
+        pthfile += abspath + "\n"
 
-    path_map = {source.get_abspath(): "" for source in roots}
-
-    if tag.endswith("-none-any"):
-        editable["scheme"]["purelib"] = path_map
-    else:
-        editable["scheme"]["platlib"] = path_map
-
-    target_dir = env["WHEEL_DIR"]
+    target_dir = env["EDITABLE_DIR"]
     build_dir = env["WHEEL_BUILD_DIR"].Dir("editable")
 
     wheel_filename = _make_wheelname(
         pyproject.dist_filename,
         pyproject.version,
         tag,
-        "editable",
     )
 
     editable_file = env.Command(
-        build_dir.File("editable.json"),
-        pyproject.file,
-        _generate_str_writer_action(json.dumps(editable, indent=4)),
+        build_dir.File(f"{pyproject.dist_filename}-{pyproject.version}.pth"),
+        None,
+        _generate_str_writer_action(pthfile),
     )
 
     wheel_metadata = _build_wheel_metadata_dir(
@@ -504,6 +492,7 @@ def Editable(env, tag: str, src_root="."):
     )
     env.AddPostAction(target, _add_manifest)
     env.Clean(target, build_dir)
+    env.Clean(target, target_dir)
     return target
 
 
@@ -673,14 +662,24 @@ def _add_manifest(target, source, env):
 
 def generate(env: Environment, **kwargs):
     pytar.generate(env)
+
     if "WHEEL_BUILD_DIR" not in env:
         env["WHEEL_BUILD_DIR"] = env.Dir("#build/")
 
-    if "WHEEL_DIR" not in env:
+    if "WHEEL_DIR" in ARGUMENTS:
+        env["WHEEL_DIR"] = env.Dir(ARGUMENTS["WHEEL_DIR"])
+    elif "WHEEL_DIR" not in env:
         env["WHEEL_DIR"] = env.Dir("#dist/")
 
-    if "SDIST_DIR" not in env:
+    if "SDIST_DIR" in ARGUMENTS:
+        env["SDIST_DIR"] = env.Dir(ARGUMENTS["SDIST_DIR"])
+    elif "SDIST_DIR" not in env:
         env["SDIST_DIR"] = env.Dir("#dist/")
+
+    if "EDITABLE_DIR" in ARGUMENTS:
+        env["EDITABLE_DIR"] = env.Dir(ARGUMENTS["EDITABLE_DIR"])
+    elif "EDITABLE_DIR" not in env:
+        env["EDITABLE_DIR"] = env.Dir("#dist/editable")
 
     pyproject_file = env.get("PYPROJECT_FILE", "pyproject.toml")
     env["PYPROJECT"] = parse_pyproject_toml(pyproject_file)

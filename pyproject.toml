@@ -1,9 +1,17 @@
+[build-system]
+build-backend = "scons517.api"
+requires = [
+    "Scons==4.4.0",
+    "packaging",
+    "toml",
+]
+backend-path = ["."]
 
 [project]
 name = "scons517"
 version = "0.0.1"
 dependencies = [
-    "SCons",
+    "SCons==4.4.0",
     "packaging",
     "toml",
 ]

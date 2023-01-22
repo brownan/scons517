@@ -1,4 +1,24 @@
+import os.path
 from typing import Optional
+
+import SCons.Script.Main
+import SCons.Script.SConsOptions
+import SCons.Node.Alias
+
+def _launch_scons(args):
+    # Make an scons option parser and pass our own args into it, instead of sys.argv
+    parser = SCons.Script.SConsOptions.Parser("")
+    parser.parse_args(args)
+
+    # Call into the main scons entry point
+    SCons.Script.Main._main(parser)
+
+    # Now look at the output of the target node
+    target: str = str(SCons.Script.BUILD_TARGETS[0])
+    alias: SCons.Node.Alias.Alias = SCons.Script.Alias(target)[0]
+    node: SCons.Node.Node = alias.sources[0]
+    filename = os.path.basename(str(node))
+    return filename
 
 
 def build_wheel(
@@ -6,11 +26,11 @@ def build_wheel(
     config_settings: Optional[dict] = None,
     metadata_directory: Optional[str] = None,
 ):
-    pass
+    return _launch_scons([f"WHEEL_DIR={wheel_directory}", "wheel"])
 
 
 def build_sdist(sdist_directory: str, config_settings: Optional[dict] = None):
-    pass
+    return _launch_scons([f"SDIST_DIR={sdist_directory}", "sdist"])
 
 
 def build_editable(
@@ -18,4 +38,4 @@ def build_editable(
     config_settings: Optional[dict] = None,
     metadata_directory: Optional[str] = None,
 ):
-    pass
+    return _launch_scons([f"EDITABLE_DIR={wheel_directory}", "editable"])
