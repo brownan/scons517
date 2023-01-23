@@ -90,7 +90,7 @@ def get_build_path(
     For a given "src" path, computes the same path rooted at the given build directory.
     build_dir can be either a string, which is then taken as the name of a subdirectory
     under env["WHEEL_BUILD_DIR"]. build_dir can also be a "Dir" object, in which case
-    it must refer to a directory which is a direct subdirectory of env["WHEEL_BUILD_DIR"]
+    it must refer to a direct subdirectory of env["WHEEL_BUILD_DIR"]
 
     This method should be used by any builders which need to output derived files
     from some source. Using this method ensures that builders compute the correct relative
@@ -127,6 +127,7 @@ def get_build_path(
 
 
 class PyProject(NamedTuple):
+    """Holds information about a parsed pyproject.toml file"""
     # Validate project name
     name: str
     # Validated version
@@ -134,12 +135,12 @@ class PyProject(NamedTuple):
     # The distribution name component to be used in filenames
     dist_filename: str
 
-    # Full deserialized project table, with name and version normalized
+    # Full deserialized project table
     project_metadata: dict
     # Tool table
     tool_metadata: dict
 
-    # The filename that it was parsed from
+    # The filename that it was parsed from, for dependency tracking
     file: str
 
 
