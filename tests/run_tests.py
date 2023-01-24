@@ -136,3 +136,20 @@ env.Alias("inplace", inplace)
             "import extension; extension.example()",
         ], cwd=self.root_dir)
         self.assertEqual(output.strip(), "Hello, world!")
+
+    def test_cython(self):
+        self._copy_file("cythonmod.pyx")
+        self._write_pyproject()
+        self._write_sconstruct(f"""
+import scons517
+env = Environment(tools=["default", scons517.tool])
+tag = {scons517.get_binary_tag()!r}
+wheel = env.Wheel(tag=tag)
+wheel.add_sources(env.CythonModule("cythonmod.pyx"))
+sdist =env.SDist(["pyproject.toml", "sconstruct.py", "cythonmod.pyx"])
+env.Alias("wheel", wheel.target)
+env.Alias("sdist", sdist)
+        """)
+
+        self._build_and_install()
+        self._assert_installed_module("cythonmod", "example")

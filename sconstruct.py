@@ -18,7 +18,6 @@ wheel = scons517.wheel.Wheel(
     root_is_purelib=True,
 )
 wheel.add_sources(sources)
-wheel.add_sources(env.ExtModule("tests/examples/extension.c"))
 
 sdist = scons517.wheel.SDist(env, sources + ["pyproject.toml", "sconstruct.py"])
 editable = scons517.wheel.Editable(env, tag)

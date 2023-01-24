@@ -3,7 +3,7 @@ import sysconfig
 import os.path
 import sys
 from pathlib import Path
-from typing import Sequence, Optional, TYPE_CHECKING
+from typing import Sequence, Optional, TYPE_CHECKING, List
 
 from SCons.Node.FS import File
 
@@ -98,6 +98,25 @@ def ExtModule(
     return library
 
 
+def _cython_action(target: List["File"], source: List["File"], env):
+    from Cython.Compiler.Main import compile_single, CompilationOptions
+    options: dict = env.get("CYTHON_OPTIONS", {})
+    options["output_file"] = target[0].get_abspath()
+    options["timestamps"] = None
+    options.setdefault("language_level", 3)
+    compile_single(
+        source[0].get_relpath(),
+        CompilationOptions(**options),
+    )
+
+
+def CythonModule(env, source: "File"):
+    source = env.arg2nodes(source, env.File)[0]
+    target = get_build_path(env, source, "cython", ".c")
+    c_source = env.Command(target, source, _cython_action)
+    return ExtModule(env, c_source)
+
+
 def InstallInplace(
     env,
     ext_module: File,
@@ -113,3 +132,4 @@ def InstallInplace(
 def generate(env, **kwargs):
     env.AddMethod(ExtModule)
     env.AddMethod(InstallInplace)
+    env.AddMethod(CythonModule)
