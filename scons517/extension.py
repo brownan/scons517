@@ -98,7 +98,7 @@ def ExtModule(
     return library
 
 
-def InstallExtensionInplace(
+def InstallInplace(
     env,
     ext_module: File,
 ):
@@ -112,4 +112,4 @@ def InstallExtensionInplace(
 
 def generate(env, **kwargs):
     env.AddMethod(ExtModule)
-    env.AddMethod(InstallExtensionInplace)
+    env.AddMethod(InstallInplace)

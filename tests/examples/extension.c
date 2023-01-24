@@ -1,17 +1,18 @@
-#define PY_SIZET_CLEAN
+#define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
 static PyObject *
 example_func(PyObject *self, PyObject *args)
 {
-    PyObject *ret = PyUnicode_FromString("Hello, world!");
-    return ret;
+    printf("Hello, world!");
+
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef ExtensionMethods[] = {
     {"example", example_func, METH_NOARGS},
     {NULL, NULL, 0, NULL}
-}
+};
 
 static struct PyModuleDef extensionmodule = {
     PyModuleDef_HEAD_INIT,
@@ -19,7 +20,7 @@ static struct PyModuleDef extensionmodule = {
     NULL,
     -1,
     ExtensionMethods,
-}
+};
 
 PyMODINIT_FUNC
 PyInit_extension(void)
