@@ -1,6 +1,5 @@
 import base64
 import hashlib
-import json
 import os
 import re
 import zipfile
@@ -10,11 +9,11 @@ from typing import (
     TYPE_CHECKING,
     Callable,
     List,
+    NamedTuple,
     Optional,
     Sequence,
     Tuple,
     Union,
-    NamedTuple,
 )
 
 import packaging.requirements
@@ -29,8 +28,8 @@ from SCons.Script import ARGUMENTS
 from scons517 import pytar
 
 if TYPE_CHECKING:
-    from SCons.Node.FS import Dir, Entry, File
     from SCons.Node import Node
+    from SCons.Node.FS import Dir, Entry, File
 
 
 def urlsafe_b64encode(data):
@@ -128,6 +127,7 @@ def get_build_path(
 
 class PyProject(NamedTuple):
     """Holds information about a parsed pyproject.toml file"""
+
     # Validate project name
     name: str
     # Validated version
@@ -236,7 +236,7 @@ def build_core_metadata(pyproject: PyProject) -> Tuple[str, List[str]]:
                     ".rst": "text/x-rst",
                     ".txt": "text/plain",
                 }[ext]
-            except KeyError as e:
+            except KeyError:
                 raise UserError(
                     f"Unknown readme file type {filename}. "
                     f'Specify an explicit "content-type" key in the {pyproject.file} '
@@ -258,7 +258,8 @@ def build_core_metadata(pyproject: PyProject) -> Tuple[str, List[str]]:
         content = metadata["license"].get("text")
         if filename and content:
             raise UserError(
-                f'"file" and "text" keys are mutually exclusive in {pyproject.file} project.license table'
+                f'"file" and "text" keys are mutually exclusive in {pyproject.file} '
+                f"project.license table"
             )
         if filename:
             content = open(filename, "r", encoding="utf-8").read()
@@ -295,7 +296,7 @@ def build_core_metadata(pyproject: PyProject) -> Tuple[str, List[str]]:
             for dep in dependencies:
                 # Validate and normalize
                 dep = str(packaging.requirements.Requirement(dep))
-                msg["Requires-Dist"] = f"{dep}; extra = '{extra_name}'"
+                msg["Requires-Dist"] = f"{dep}; extra == '{extra_name}'"
 
     return str(msg), sources
 
@@ -394,8 +395,6 @@ class Wheel:
         All directories between the root and the source file are preserved in the wheel file.
 
         """
-        sources = self.env.arg2nodes(sources, self.env.Entry)
-
         source: Entry
         for source in self.env.arg2nodes(sources, self.env.Entry):
             rel_path = get_rel_path(self.env, source)
@@ -529,8 +528,8 @@ def _build_wheel_metadata_dir(
     msg["Root-Is-Purelib"] = str(root_is_purelib).lower()
     if build_num is not None:
         msg["Build"] = build_num
-    for tag in packaging.tags.parse_tag(tag):
-        msg["Tag"] = str(tag)
+    for t in packaging.tags.parse_tag(tag):
+        msg["Tag"] = str(t)
     if editable:
         msg["Editable"] = "true"
 
@@ -544,7 +543,9 @@ def _build_wheel_metadata_dir(
 
     output_targets.extend(
         env.Command(
-            wheel_data_dir.File("entry_points.txt"), [pyproject.file], _build_entry_points
+            wheel_data_dir.File("entry_points.txt"),
+            [pyproject.file],
+            _build_entry_points,
         )
     )
     return output_targets
@@ -557,20 +558,25 @@ def _wheel_data_dir(build_dir: "Dir", pyproject: PyProject):
 
 
 def _make_wheelname(dist_name, version, wheel_tag, build_tag=None):
-    # Reference https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention
+    # Reference
+    # https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-name-convention
     if build_tag:
         template = "{distribution}-{version}-{build_tag}-{wheel_tag}.whl"
     else:
         template = "{distribution}-{version}-{wheel_tag}.whl"
     return template.format(
-        distribution=dist_name, version=version, wheel_tag=wheel_tag, build_tag=build_tag
+        distribution=dist_name,
+        version=version,
+        wheel_tag=wheel_tag,
+        build_tag=build_tag,
     )
 
 
 def _write_contacts(
     msg: Message, header_name: str, header_email: str, contacts: List[dict]
 ):
-    # Reference https://packaging.python.org/en/latest/specifications/declaring-project-metadata/#authors-maintainers
+    # Reference
+    # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/#authors-maintainers
     names = []
     emails = []
     for contact in contacts:
@@ -578,7 +584,8 @@ def _write_contacts(
         email = contact.get("email")
         if not name and not email:
             raise UserError(
-                f'At least one of "name" or "email" must be specified for each author and maintainer'
+                'At least one of "name" or "email" must be specified for each author '
+                "and maintainer"
             )
         elif name and not email:
             names.append(name)
@@ -644,7 +651,9 @@ def _add_manifest(target, source, env):
     # Called after the wheel file has been written to the filesystem.
     pyproject: PyProject = env["PYPROJECT"]
     data_dir_name = f"{pyproject.dist_filename}-{pyproject.version}.dist-info"
-    archive = zipfile.ZipFile(target[0].get_path(), "a", compression=zipfile.ZIP_DEFLATED)
+    archive = zipfile.ZipFile(
+        target[0].get_path(), "a", compression=zipfile.ZIP_DEFLATED
+    )
     lines = []
     for f in archive.namelist():
         data = archive.read(f)

@@ -1,10 +1,11 @@
 import os.path
-from typing import Optional
 import tempfile
+from typing import Optional
 
+import SCons.Node.Alias
 import SCons.Script.Main
 import SCons.Script.SConsOptions
-import SCons.Node.Alias
+
 
 def _launch_scons(args):
     with tempfile.TemporaryDirectory() as build_dir:

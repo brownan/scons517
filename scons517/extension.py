@@ -1,29 +1,18 @@
-import shlex
-import sysconfig
 import os.path
+import shlex
 import sys
-from pathlib import Path
-from typing import Sequence, Optional, TYPE_CHECKING, List
-
-from SCons.Node.FS import File
+import sysconfig
+from typing import TYPE_CHECKING, List, Optional, Sequence
 
 from scons517.wheel import get_build_path, get_rel_path
 
 if TYPE_CHECKING:
-    from SCons.Node.FS import Dir, Entry, File
-    from SCons.Node import Node
+    from SCons.Node.FS import Dir, File
 
 
 def configure_compiler_env(env):
     # Get compiler and compiler options we need to build a python extension module
-    (
-        cc,
-        cxx,
-        cflags,
-        ccshared,
-        ldshared,
-        ext_suffix,
-    ) = sysconfig.get_config_vars(
+    (cc, cxx, cflags, ccshared, ldshared, ext_suffix,) = sysconfig.get_config_vars(
         "CC",
         "CXX",
         "CFLAGS",
@@ -69,8 +58,8 @@ def configure_compiler_env(env):
 
 def ExtModule(
     env,
-    modsource: File,
-    extra_sources: Optional[Sequence[File]] = None,
+    modsource: "File",
+    extra_sources: Optional[Sequence["File"]] = None,
 ):
     """Compiles and adds an extension module to a wheel"""
     env = env.Clone()
@@ -99,7 +88,8 @@ def ExtModule(
 
 
 def _cython_action(target: List["File"], source: List["File"], env):
-    from Cython.Compiler.Main import compile_single, CompilationOptions
+    from Cython.Compiler.Main import CompilationOptions, compile_single
+
     options: dict = env.get("CYTHON_OPTIONS", {})
     options["output_file"] = target[0].get_abspath()
     options["timestamps"] = None
@@ -119,7 +109,7 @@ def CythonModule(env, source: "File"):
 
 def InstallInplace(
     env,
-    ext_module: File,
+    ext_module: "File",
 ):
     targets = []
     ext_modules = env.arg2nodes(ext_module, env.File)

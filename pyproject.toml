@@ -15,3 +15,26 @@ dependencies = [
     "packaging",
     "toml",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "mypy",
+    "sphinx",
+    "furo",
+]
+
+[tool.balck]
+target-version = ['py38']
+line-length = 90
+
+[tool.flake8]
+max_line_length = 90
+select = "E,F,W,B,B950,I25"
+ban-relative-imports = true
+extend-ignore = "E203,E266,E501,B007"
+per-file-ignores = "sconstruct.py:F821"
+
+[tool.isort]
+profile = "black"
+atomic = true
