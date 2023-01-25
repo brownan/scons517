@@ -664,7 +664,9 @@ def _add_manifest(target, source, env):
 def generate(env: Environment, **kwargs):
     pytar.generate(env)
 
-    if "WHEEL_BUILD_DIR" not in env:
+    if "WHEEL_BUILD_DIR" in ARGUMENTS:
+        env["WHEEL_BUILD_DIR"] = env.Dir(ARGUMENTS["WHEEL_BUILD_DIR"])
+    elif "WHEEL_BUILD_DIR" not in env:
         env["WHEEL_BUILD_DIR"] = env.Dir("#build/")
 
     if "WHEEL_DIR" in ARGUMENTS:

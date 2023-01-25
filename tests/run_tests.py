@@ -1,6 +1,7 @@
 import contextlib
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 import pathlib
@@ -29,10 +30,16 @@ def _subp_exec(cmd, cwd=None):
 class TestScons517(unittest.TestCase):
     def setUp(self):
         with contextlib.ExitStack() as stack:
-            # Root of our fake "test" package
-            self.root_dir = pathlib.Path(stack.enter_context(tempfile.TemporaryDirectory()))
+            # Temp dir for built wheels
+            self.dist_dir = stack.enter_context(tempfile.TemporaryDirectory())
 
-            # Isolated virtual environment which we'll be installing our build test
+            # Isolated virtual environment with which we'll build packages in
+            self.build_env = stack.enter_context(build.env.IsolatedEnvBuilder())
+            self.build_env.install(["pip>=22.3.1"])
+            self.build_env.install(
+                ["scons517 @ file://{}".format(os.path.abspath(scons517_dir))])
+
+            # Isolated virtual environment which we'll be installing our built test
             # packages into
             self.install_env: build.env._IsolatedEnvVenvPip
             self.install_env = stack.enter_context(build.env.IsolatedEnvBuilder())
@@ -40,14 +47,8 @@ class TestScons517(unittest.TestCase):
 
             self.context = stack.pop_all()
 
-
     def tearDown(self) -> None:
         self.context.__exit__(None, None, None)
-
-    def _copy_file(self, example_file):
-        """Copy a file into the fake source directory"""
-        with open(examples_dir / example_file) as infile:
-            self.root_dir.joinpath(example_file).write_text(infile.read())
 
     def _assert_installed_module(self, module, function):
         """Runs a python function in the install environment and
@@ -61,60 +62,56 @@ class TestScons517(unittest.TestCase):
         output = _subp_exec(cmd)
         self.assertEqual(output.strip(), "Hello, world!")
 
-    def _write_pyproject(self):
-        self.root_dir.joinpath("pyproject.toml").write_text(f"""
-[build-system]
-build-backend = "scons517.api"
-requires = [
-    "scons517 @ file://{scons517_dir.resolve()}"
-]
-[project]
-name = "testproject"
-version = "1.0.0"
-        """)
+    def _make_isolated_builder(self, src_dir):
+        builder = build.ProjectBuilder(src_dir)
+        builder.python_executable = self.build_env.executable
+        builder.scripts_dir = self.build_env.scripts_dir
+        self.build_env.install(builder.build_system_requires)
+        return builder
 
-    def _write_sconstruct(self, contents: str):
-        self.root_dir.joinpath("sconstruct.py").write_text(contents)
+    def _build_sdist(self, proj_dir):
+        """Build an sdist from the given example project in an isolated environment.
 
-    def test_pure_python(self):
-        """Builds a wheel containing a single python module"""
-        self._copy_file("module.py")
-        self._write_pyproject()
-        self._write_sconstruct(f"""
-import scons517
-env = Environment(tools=["default", scons517.tool])
-tag = {scons517.get_pure_tag()!r}
-wheel = env.Wheel(tag=tag)
-wheel.add_sources(["module.py"])
-sdist=env.SDist(["pyproject.toml", "sconstruct.py", "module.py"])
-env.Alias("wheel", wheel.target)
-env.Alias("sdist", sdist)
-        """)
+        """
+        build_env = self.build_env
+        builder = self._make_isolated_builder(proj_dir)
+        return builder.build("sdist", self.dist_dir)
 
-        self._build_and_install()
+    def _build_wheel_from_sdist(self, sdist_path):
+        """Builds a wheel from an sdist"""
+        sdist_name = os.path.basename(sdist_path)[:-len(".tar.gz")]
+        sdist_extract_dir = self.context.enter_context(tempfile.TemporaryDirectory())
+        with tarfile.open(sdist_path) as t:
+            t.extractall(sdist_extract_dir)
+        builder = self._make_isolated_builder(
+            os.path.join(sdist_extract_dir, sdist_name)
+        )
+        return builder.build("wheel", self.dist_dir)
+
+
+    def _build_and_install(self, proj_dir):
+        sdist = self._build_sdist(proj_dir)
+        wheel = os.path.abspath(self._build_wheel_from_sdist(sdist))
+        self.install_env.install([f"testproject@file://{wheel}"])
+
+    def test_pure_python_ex(self):
+        """Tests the pure python example project"""
+        proj_dir = examples_dir / "pure-python"
+        self._build_and_install(proj_dir)
         self._assert_installed_module("module", "example")
 
-    def _build_and_install(self):
-        builder = build.ProjectBuilder(self.root_dir)
-        whl_path = builder.build("wheel", self.root_dir / "dist")
-        self.install_env.install([f"testproject@file://{whl_path}"])
 
     def test_extension_module(self):
-        self._copy_file("extension.c")
-        self._write_pyproject()
-        self._write_sconstruct(f"""
-import scons517
-env = Environment(tools=["default", scons517.tool])
-tag = {scons517.get_binary_tag()!r}
-wheel = env.Wheel(tag=tag)
-wheel.add_sources(env.ExtModule("extension.c"))
-sdist =env.SDist(["pyproject.toml", "sconstruct.py", "extension.c"])
-env.Alias("wheel", wheel.target)
-env.Alias("sdist", sdist)
-        """)
-
-        self._build_and_install()
+        """Tests the example project with a compiled C extension"""
+        proj_dir = examples_dir / "c-extension"
+        self._build_and_install(proj_dir)
         self._assert_installed_module("extension", "example")
+
+    def test_cython(self):
+        proj_dir = examples_dir / "cython"
+        self._build_and_install(proj_dir)
+        self._assert_installed_module("cythonmod", "example")
+
 
     def test_install_inplace(self):
         self._copy_file("extension.c")
@@ -136,20 +133,3 @@ env.Alias("inplace", inplace)
             "import extension; extension.example()",
         ], cwd=self.root_dir)
         self.assertEqual(output.strip(), "Hello, world!")
-
-    def test_cython(self):
-        self._copy_file("cythonmod.pyx")
-        self._write_pyproject()
-        self._write_sconstruct(f"""
-import scons517
-env = Environment(tools=["default", scons517.tool])
-tag = {scons517.get_binary_tag()!r}
-wheel = env.Wheel(tag=tag)
-wheel.add_sources(env.CythonModule("cythonmod.pyx"))
-sdist =env.SDist(["pyproject.toml", "sconstruct.py", "cythonmod.pyx"])
-env.Alias("wheel", wheel.target)
-env.Alias("sdist", sdist)
-        """)
-
-        self._build_and_install()
-        self._assert_installed_module("cythonmod", "example")

@@ -1,0 +1,9 @@
+[build-system]
+build-backend = "scons517.api"
+requires = [
+    "scons517",
+]
+
+[project]
+name = "testproject"
+version = "1.0.0"

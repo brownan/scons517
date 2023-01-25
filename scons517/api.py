@@ -1,17 +1,22 @@
 import os.path
 from typing import Optional
+import tempfile
 
 import SCons.Script.Main
 import SCons.Script.SConsOptions
 import SCons.Node.Alias
 
 def _launch_scons(args):
-    # Make an scons option parser and pass our own args into it, instead of sys.argv
-    parser = SCons.Script.SConsOptions.Parser("")
-    parser.parse_args(args)
+    with tempfile.TemporaryDirectory() as build_dir:
+        args.append(f"WHEEL_BUILD_DIR={build_dir}")
+        args.append("--silent")
 
-    # Call into the main scons entry point
-    SCons.Script.Main._main(parser)
+        # Make an scons option parser and pass our own args into it, instead of sys.argv
+        parser = SCons.Script.SConsOptions.Parser("")
+        parser.parse_args(args)
+
+        # Call into the main scons entry point
+        SCons.Script.Main._main(parser)
 
     # Now look at the output of the target node
     target: str = str(SCons.Script.BUILD_TARGETS[0])
