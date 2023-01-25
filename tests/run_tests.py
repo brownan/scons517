@@ -114,22 +114,15 @@ class TestScons517(unittest.TestCase):
 
 
     def test_install_inplace(self):
-        self._copy_file("extension.c")
-        self._write_pyproject()
-        self._write_sconstruct(f"""
-import scons517
-env = Environment(tools=["default", scons517.tool])
-tag = {scons517.get_binary_tag()!r}
-wheel = env.Wheel(tag=tag)
-inplace = env.InstallInplace(env.ExtModule("extension.c"))
-env.Alias("inplace", inplace)
-        """)
+        # Install environment needs the build requirements
+        self.install_env.install(
+            ["scons517 @ file://{}".format(os.path.abspath(scons517_dir))])
         _subp_exec([
-            "scons", "inplace"
-        ], cwd=self.root_dir)
-        output = _subp_exec([
-            sys.executable,
-            "-c",
-            "import extension; extension.example()",
-        ], cwd=self.root_dir)
-        self.assertEqual(output.strip(), "Hello, world!")
+            self.install_env.executable,
+            "-m", "pip",
+            "install",
+            "--no-build-isolation",
+            "-e",
+            str(examples_dir / "pure-python")
+        ])
+        self._assert_installed_module("module", "example")
