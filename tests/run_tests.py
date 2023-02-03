@@ -83,9 +83,7 @@ class TestScons517(unittest.TestCase):
         sdist_extract_dir = self.context.enter_context(tempfile.TemporaryDirectory())
         with tarfile.open(sdist_path) as t:
             t.extractall(sdist_extract_dir)
-        builder = self._make_isolated_builder(
-            os.path.join(sdist_extract_dir, sdist_name)
-        )
+        builder = self._make_isolated_builder(os.path.join(sdist_extract_dir, sdist_name))
         return builder.build("wheel", self.dist_dir)
 
     def _build_and_install(self, proj_dir):

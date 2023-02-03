@@ -651,9 +651,7 @@ def _add_manifest(target, source, env):
     # Called after the wheel file has been written to the filesystem.
     pyproject: PyProject = env["PYPROJECT"]
     data_dir_name = f"{pyproject.dist_filename}-{pyproject.version}.dist-info"
-    archive = zipfile.ZipFile(
-        target[0].get_path(), "a", compression=zipfile.ZIP_DEFLATED
-    )
+    archive = zipfile.ZipFile(target[0].get_path(), "a", compression=zipfile.ZIP_DEFLATED)
     lines = []
     for f in archive.namelist():
         data = archive.read(f)

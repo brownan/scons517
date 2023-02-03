@@ -13,9 +13,7 @@ def tool(env: Environment):
 def get_binary_tag():
     """Gets the most specific binary tag for the current machine"""
     return str(
-        next(
-            tag for tag in packaging.tags.sys_tags() if "manylinux" not in tag.platform
-        )
+        next(tag for tag in packaging.tags.sys_tags() if "manylinux" not in tag.platform)
     )
 
 

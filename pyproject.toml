@@ -25,7 +25,7 @@ dev = [
     "types-toml",
 ]
 
-[tool.balck]
+[tool.black]
 target-version = ['py38']
 line-length = 90
 
