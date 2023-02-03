@@ -22,6 +22,7 @@ dev = [
     "mypy",
     "sphinx",
     "furo",
+    "types-toml",
 ]
 
 [tool.balck]
