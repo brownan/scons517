@@ -9,7 +9,7 @@ backend-path = ["."]
 
 [project]
 name = "scons517"
-version = "0.0.1"
+version = "0.0.1.post1"
 description = "Pep 517 compliant Python Distribution Wheel Builder"
 authors = [
     {name = "Andrew Brown", email = "andrew@brownan.org"},
@@ -26,6 +26,9 @@ dependencies = [
 ]
 readme = "README.md"
 requires-python = ">=3.8"
+
+[project.urls]
+"Source Code" = "https://github.com/brownan/scons517"
 
 [project.optional-dependencies]
 dev = [
