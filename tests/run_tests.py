@@ -125,3 +125,6 @@ class TestScons517(unittest.TestCase):
             ]
         )
         self._assert_installed_module("module", "example")
+
+if __name__ == "__main__":
+    unittest.main()

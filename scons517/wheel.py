@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import os
+import pathlib
 import re
 import zipfile
 from configparser import ConfigParser
@@ -24,6 +25,7 @@ import toml
 from SCons.Environment import Environment
 from SCons.Errors import UserError
 from SCons.Script import ARGUMENTS
+from SCons.Util import flatten
 
 from scons517 import pytar
 
@@ -122,6 +124,25 @@ def get_build_path(
         full_path = os.path.splitext(full_path)[0] + new_ext
     return full_path
 
+PathLike = Union[str, pathlib.Path, "Entry"]
+def arg2nodes(objs: Union[PathLike , List[PathLike]], node_factory) -> List["Entry"]:
+    """Turns strings or path objects into nodes. Similar to the
+    build-in Environment.arg2nodes, but supports Path objects.
+
+    """
+    if not objs:
+        return []
+    objs_flattened: List[PathLike] = flatten(objs)
+
+    nodes = []
+    for obj in objs_flattened:
+        if isinstance(obj, str):
+            nodes.append(node_factory(obj))
+        elif isinstance(obj, pathlib.Path):
+            nodes.append(node_factory(str(obj)))
+        else:
+            nodes.append(obj)
+    return nodes
 
 class PyProject(NamedTuple):
     """Holds information about a parsed pyproject.toml file"""
@@ -362,10 +383,13 @@ class Wheel:
             build_num=build_num,
         )
 
-        self._zip_env = env.Clone(ZIPROOT=self.wheel_build_dir)
+        self._zip_env = env.Clone(
+            ZIPROOT=self.wheel_build_dir,
+            ZIPCOMSTR=f"Building final wheel at $TARGETS from {self.wheel_build_dir}"
+        )
         self.target = self._add_zip_sources(metadata_targets)
 
-        env.AddPostAction(self.target, _add_manifest)
+        env.AddPostAction(self.target, env.Action(_add_manifest, None))
         env.Clean(self.target, self.wheel_build_dir)
         env.NoClean(self.target)
 
@@ -404,7 +428,7 @@ class Wheel:
 
         """
         source: Entry
-        for source in self.env.arg2nodes(sources, self.env.Entry):
+        for source in arg2nodes(sources, self.env.Entry):
             rel_path = get_rel_path(self.env, source)
             rel_path = os.path.relpath(rel_path, root)
             install_path = self.wheel_build_dir.Entry(rel_path)
@@ -413,7 +437,7 @@ class Wheel:
 
     def add_data(self, category, sources, root="."):
         """Add sources to the data directory called "category", relative to the given root"""
-        for source in self.env.arg2nodes(sources, self.env.Entry):
+        for source in arg2nodes(sources, self.env.Entry):
             rel_path = get_rel_path(self.env, source)
             rel_path = os.path.relpath(rel_path, root)
             install_path = self.wheel_data_dir.Dir(category).Entry(rel_path)
@@ -422,7 +446,7 @@ class Wheel:
 
 
 def SDist(env: Environment, sources) -> List["Entry"]:
-    sources = env.arg2nodes(sources, env.Entry)
+    sources = arg2nodes(sources, env.Entry)
     build_dir = env["WHEEL_BUILD_DIR"].Dir("sdist")
     # Source dists must contain a pyproject.toml file
     if env.File("pyproject.toml") not in sources:
@@ -463,7 +487,7 @@ def Editable(env, tag: str, src_root="."):
     See PEP 660
     https://peps.python.org/pep-0660/
     """
-    roots = env.arg2nodes(src_root, env.Dir)
+    roots = arg2nodes(src_root, env.Dir)
     pyproject: PyProject = env["PYPROJECT"]
 
     pthfile = ""
@@ -532,7 +556,7 @@ def _build_wheel_metadata_dir(
     # Build wheel metadata
     msg = Message()
     msg["Wheel-Version"] = "1.0"
-    msg["Generator"] = "enscons"
+    msg["Generator"] = "scons517"
     msg["Root-Is-Purelib"] = str(root_is_purelib).lower()
     if build_num is not None:
         msg["Build"] = build_num
