@@ -41,8 +41,6 @@ DIST_NAME_RE = re.compile(
     "^([A-Z0-9]|[A-Z0-9][A-Z0-9._-]*[A-Z0-9])$", flags=re.IGNORECASE
 )
 EXTRA_RE = re.compile("^([a-z0-9]|[a-z0-9]([a-z0-9-](?!--))*[a-z0-9])$")
-EPOINT_GROUP_RE = re.compile(r"^\w+(\.\w+)*$")
-EPOINT_NAME_RE = re.compile(r"[\w.-]+")
 
 
 def get_rel_path(env: Environment, src: Union[str, "Entry"]) -> str:
@@ -188,7 +186,16 @@ def build_core_metadata(pyproject: PyProject) -> Tuple[str, List[str]]:
     metadata = pyproject.project_metadata
 
     # Required metadata
-    msg["Metadata-Version"] = "2.3"
+    # This routine writes metadata compatible with version 2.3, but the pypi index only
+    # currently supports 2.1 as of Feb 2023.
+    # See https://github.com/pypi/warehouse/pull/11380
+    # Additionally, the pkginfo library used by the twine utility only supports up to 2.2
+    # Things should still be compatible by the following logic:
+    # New in 2.2 is the Dynamic field, which this metadata writer doesn't use.
+    # New in 2.3 was a required unambiguous format for extra names, to replace previous
+    # normalization rules. This metadata writer enforces the extra name format and therefore
+    # extra names are always unambiguous, making it compatible with older readers.
+    msg["Metadata-Version"] = "2.1"
     msg["Name"] = pyproject.name
     msg["Version"] = pyproject.version
 
@@ -253,6 +260,7 @@ def build_core_metadata(pyproject: PyProject) -> Tuple[str, List[str]]:
     # field. I wonder if the spec intended to e.g. include the entire GPL here?
     # I think the intent was to only use this field if the license is something
     # non-standard. Otherwise, use the appropriate classifier.
+    # See https://packaging.python.org/en/latest/specifications/declaring-project-metadata/#license
     if "license" in metadata:
         filename = metadata["license"].get("file")
         content = metadata["license"].get("text")
