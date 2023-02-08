@@ -6,6 +6,8 @@ import sysconfig
 from typing import TYPE_CHECKING, List, Optional, Sequence
 
 import SCons.Action
+from SCons.Defaults import Delete
+from SCons.Environment import Environment
 
 from scons517.wheel import get_build_path, get_rel_path
 from scons517 import arg2nodes
@@ -123,21 +125,23 @@ def InstallInplace(
     for module in ext_modules:
         relpath = get_rel_path(env, module)
         targets.extend(env.InstallAs(relpath, module))
-    # When cleaning the inplace target, don't clear out the built shared objects from the build
-    # directory, so running this target again is quick.
-    # Usually scons clean mode will remove the target and all dependencies, but this is an
-    # exception where we want to leave all dependencies. I'm not sure a better way to do this.
-    # NoClean is conditionally applied so that cleaning other targets /does/ remove temp files
-    if env.GetOption("clean"):
-        deps = list(ext_modules)
-        while deps:
-            dep = deps.pop()
-            env.NoClean(dep)
-            deps.extend(dep.sources)
     return targets
 
+
+def InplaceClean(
+    env: Environment,
+    ext_module: "File",
+    alias_name = "inplace-clean",
+):
+    paths_to_delete = [
+        get_rel_path(env, module) for module in arg2nodes(ext_module, env.File)
+    ]
+    node = env.Alias(alias_name, action=Delete(paths_to_delete, "deleting"))
+    env.AlwaysBuild(node)
+    return node
 
 def generate(env, **kwargs):
     env.AddMethod(ExtModule)
     env.AddMethod(InstallInplace)
     env.AddMethod(CythonModule)
+    env.AddMethod(InplaceClean)
