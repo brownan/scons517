@@ -1,7 +1,6 @@
 import base64
 import hashlib
 import os
-import pathlib
 import re
 import zipfile
 from configparser import ConfigParser
@@ -25,9 +24,8 @@ import toml
 from SCons.Environment import Environment
 from SCons.Errors import UserError
 from SCons.Script import ARGUMENTS
-from SCons.Util import flatten
 
-from scons517 import pytar
+from scons517 import arg2nodes, pytar
 
 if TYPE_CHECKING:
     from SCons.Node import Node
@@ -124,25 +122,6 @@ def get_build_path(
         full_path = os.path.splitext(full_path)[0] + new_ext
     return full_path
 
-PathLike = Union[str, pathlib.Path, "Entry"]
-def arg2nodes(objs: Union[PathLike , List[PathLike]], node_factory) -> List["Entry"]:
-    """Turns strings or path objects into nodes. Similar to the
-    build-in Environment.arg2nodes, but supports Path objects.
-
-    """
-    if not objs:
-        return []
-    objs_flattened: List[PathLike] = flatten(objs)
-
-    nodes = []
-    for obj in objs_flattened:
-        if isinstance(obj, str):
-            nodes.append(node_factory(obj))
-        elif isinstance(obj, pathlib.Path):
-            nodes.append(node_factory(str(obj)))
-        else:
-            nodes.append(obj)
-    return nodes
 
 class PyProject(NamedTuple):
     """Holds information about a parsed pyproject.toml file"""

@@ -1,10 +1,14 @@
 import os.path
 import shlex
+import subprocess
 import sys
 import sysconfig
 from typing import TYPE_CHECKING, List, Optional, Sequence
 
+import SCons.Action
+
 from scons517.wheel import get_build_path, get_rel_path
+from scons517 import arg2nodes
 
 if TYPE_CHECKING:
     from SCons.Node.FS import Dir, File
@@ -69,12 +73,12 @@ def ExtModule(
     build_dir: "Dir" = env["WHEEL_BUILD_DIR"].Dir(f"temp.{platform_specifier}")
     lib_dir: "Dir" = env["WHEEL_BUILD_DIR"].Dir(f"lib.{platform_specifier}")
 
-    modsource = env.arg2nodes(modsource, env.File)[0]
+    modsource = arg2nodes(modsource, env.File)[0]
 
     source_files = [modsource]
 
     if extra_sources:
-        source_files.extend(env.arg2nodes(extra_sources, env.File))
+        source_files.extend(arg2nodes(extra_sources, env.File))
 
     objects = []
     for node in source_files:
@@ -88,22 +92,25 @@ def ExtModule(
 
 
 def _cython_action(target: List["File"], source: List["File"], env):
-    from Cython.Compiler.Main import CompilationOptions, compile_single
-
-    options: dict = env.get("CYTHON_OPTIONS", {})
-    options["output_file"] = target[0].get_abspath()
-    options["timestamps"] = None
-    options.setdefault("language_level", 3)
-    compile_single(
-        source[0].get_relpath(),
-        CompilationOptions(**options),
+    subprocess.check_call(
+        [
+            "cython",
+            "-3",
+            "-o", target[0].get_abspath(),
+            source[0].get_relpath(),
+        ],
     )
+
+CythonAction = SCons.Action.Action(
+    _cython_action,
+    "Cythonizing $SOURCE",
+)
 
 
 def CythonModule(env, source: "File"):
-    source = env.arg2nodes(source, env.File)[0]
+    source = arg2nodes(source, env.File)[0]
     target = get_build_path(env, source, "cython", ".c")
-    c_source = env.Command(target, source, _cython_action)
+    c_source = env.Command(target, source, CythonAction)
     return ExtModule(env, c_source)
 
 
@@ -112,10 +119,21 @@ def InstallInplace(
     ext_module: "File",
 ):
     targets = []
-    ext_modules = env.arg2nodes(ext_module, env.File)
+    ext_modules = arg2nodes(ext_module, env.File)
     for module in ext_modules:
         relpath = get_rel_path(env, module)
         targets.extend(env.InstallAs(relpath, module))
+    # When cleaning the inplace target, don't clear out the built shared objects from the build
+    # directory, so running this target again is quick.
+    # Usually scons clean mode will remove the target and all dependencies, but this is an
+    # exception where we want to leave all dependencies. I'm not sure a better way to do this.
+    # NoClean is conditionally applied so that cleaning other targets /does/ remove temp files
+    if env.GetOption("clean"):
+        deps = list(ext_modules)
+        while deps:
+            dep = deps.pop()
+            env.NoClean(dep)
+            deps.extend(dep.sources)
     return targets
 
 

@@ -1,11 +1,14 @@
+import pathlib
+from typing import Iterable, List, Union
+
 import packaging.tags
 from SCons.Environment import Environment
-
-import scons517.extension
-import scons517.wheel
+from SCons.Util import flatten
 
 
 def tool(env: Environment):
+    import scons517.extension
+    import scons517.wheel
     scons517.wheel.generate(env)
     scons517.extension.generate(env)
 
@@ -40,3 +43,25 @@ def get_pure_tag():
         f"py{packaging.tags.interpreter_version()}"
     )
     return f"{interp_tag}-none-any"
+
+
+PathLike = Union[str, pathlib.Path, "Base"]
+
+def arg2nodes(objs: Union[PathLike , List[PathLike]], node_factory):
+    """Turns strings or path objects into nodes. Similar to the
+    build-in Environment.arg2nodes, but supports Path objects.
+
+    """
+    if not objs:
+        return []
+    objs_flattened: List[PathLike] = flatten(objs, SequenceTypes=Iterable)
+
+    nodes = []
+    for obj in objs_flattened:
+        if isinstance(obj, str):
+            nodes.append(node_factory(obj))
+        elif isinstance(obj, pathlib.Path):
+            nodes.append(node_factory(str(obj)))
+        else:
+            nodes.append(obj)
+    return nodes
