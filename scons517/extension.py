@@ -128,20 +128,7 @@ def InstallInplace(
     return targets
 
 
-def InplaceClean(
-    env: Environment,
-    ext_module: "File",
-    alias_name = "inplace-clean",
-):
-    paths_to_delete = [
-        get_rel_path(env, module) for module in arg2nodes(ext_module, env.File)
-    ]
-    node = env.Alias(alias_name, action=Delete(paths_to_delete, "deleting"))
-    env.AlwaysBuild(node)
-    return node
-
 def generate(env, **kwargs):
     env.AddMethod(ExtModule)
     env.AddMethod(InstallInplace)
     env.AddMethod(CythonModule)
-    env.AddMethod(InplaceClean)
