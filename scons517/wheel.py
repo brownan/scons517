@@ -24,12 +24,12 @@ import toml
 from SCons.Environment import Environment
 from SCons.Errors import UserError
 from SCons.Script import ARGUMENTS
+from SCons.Node.FS import Dir, Entry, File, Mkdir
 
 from scons517 import arg2nodes, pytar
 
 if TYPE_CHECKING:
     from SCons.Node import Node
-    from SCons.Node.FS import Dir, Entry, File
 
 
 def urlsafe_b64encode(data):
@@ -410,7 +410,7 @@ class Wheel:
         # The call to sorted makes sure sources are always added in a consistent order. Otherwise,
         # scons's checks for out of date dependencies gets confused, especially when unordered
         # sets are used to store sources prior to calling this.
-        for source in arg2nodes(sorted(sources), self.env.Entry):
+        for source in sorted(arg2nodes(sources, self.env.Entry)):
             rel_path = get_rel_path(self.env, source)
             rel_path = os.path.relpath(rel_path, root)
             install_path = self.wheel_build_dir.Entry(rel_path)
@@ -419,7 +419,7 @@ class Wheel:
 
     def add_data(self, category, sources, root="."):
         """Add sources to the data directory called "category", relative to the given root"""
-        for source in arg2nodes(sorted(sources), self.env.Entry):
+        for source in sorted(arg2nodes(sources, self.env.Entry)):
             rel_path = get_rel_path(self.env, source)
             rel_path = os.path.relpath(rel_path, root)
             install_path = self.wheel_data_dir.Dir(category).Entry(rel_path)
@@ -428,7 +428,7 @@ class Wheel:
 
 
 def SDist(env: Environment, sources) -> List["Entry"]:
-    sources = arg2nodes(sorted(sources), env.Entry)
+    sources = sorted(arg2nodes(sources, env.Entry))
     build_dir = env["WHEEL_BUILD_DIR"].Dir("sdist")
     # Source dists must contain a pyproject.toml file
     if env.File("pyproject.toml") not in sources:
