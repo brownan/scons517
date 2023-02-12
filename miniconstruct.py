@@ -199,8 +199,34 @@ class Wheel(minicons.Builder):
 
     def build(self, target):
         zip = zipfile.ZipFile(target.path, "w")
-        for root, sourcefile in self.wheel_sources:
-            rel_path =
+        for root, sources in self.wheel_sources:
+            for source in sources:
+                rel_path = sourcefile.rel_path
+                if rel_path.startswith(root):
+                    rel_path = rel_path[len(root):]
+                    zip.write(source.get_abspath(), rel_path)
+
+class ExtensionModule(minicons.Builder):
+    def __init__(self, env, source, extra_sources):
+        super().__init__(env)
+        self.source = env.DependFile(self, source)
+        self.extra_sources = env.DependFiles(extra_sources)
+
+    def get_targets():
+        # Perhaps there could be a helper method to convert a file into a new
+        # abstract file. It would eliminate boilerplate related to passing the
+        # relative path through.
+        return AbstractFile(
+                name=os.path.splitext(self.source.name)[0] + ".so",
+                rel_path=self.source.rel_path,
+        )
+
+    def build(self, target):
+        subprocess.check_call(
+                ["cc", "-o", target.get_abspath(), self.source.get_abspath()] + [s.get_abspath() for s in self.extra_sources]
+        )
+
+
 
 env = Environment()
 sources = list(env.root.glob("pkgname/**/*.py"))
