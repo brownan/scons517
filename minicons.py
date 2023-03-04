@@ -1,30 +1,137 @@
 """Proof of concept of a dead simple dependency tracker and build framework"""
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable, Iterator, List, NewType, Optional, Tuple, TypeVar, Union, Dict
+
+DependsTypes = Union["File", "Dir", "Builder", str, Iterable["File"], Iterable[str]]
 
 
-class File:
-    """Represents a file, perhaps abstract
+class Environment:
+    def __init__(self, build_dir: Optional[Path]):
+        self.root = Path.cwd()
+        self.build_root = build_dir or self.root.joinpath("build")
+        self.known_paths: Dict[Path, Union["File", "Dir"]] = {}
 
-    An abstract file is a file that does not yet have a location (path) on the filesystem
+    def file(self, *args, **kw):
+        return File(self, *args, **kw)
 
-    A concrete file is one which has a path, but the file may or may not yet exist.
+    def get_rel_path(self, src: Union[str, Path]) -> Path:
+        src = self.root.relative_to(src)
+        return src.relative_to(self.root)
+
+    def get_build_path(
+        self,
+        src: Union[str, Path],
+        build_dir: Union[str, Path],
+        new_ext: Optional[str] = None,
+    ) -> Path:
+        rel_path = self.get_rel_path(src)
+        build_dir = self.build_root.joinpath(build_dir)
+
+        full_path = build_dir.joinpath(rel_path).relative_to(self.root)
+        if new_ext is not None:
+            full_path = full_path.with_suffix(new_ext)
+        return full_path
+
+    def DependsFiles(
+        self,
+        builder: "Builder",
+        sources: DependsTypes,
+    ) -> Union[Iterable["File"], "Dir"]:
+        """Record "builder" as depending on the given sources.
+
+        Returns an opaque iterable of objects which will, during the build phase, have a
+        get_path() method usable to get a location on the filesystem to read the source.
+
+        Sources may be any of:
+
+        * Abstract file, in which case a list of length one is returned with a File object
+          which will be concrete during the build phase.
+        * Concrete file, in which case a list of length one is returned containing that file
+          object
+        * Abstract or concrete Dir, in which case a Dir object will be returned which,
+          when iterated over during the build phase, will iterate over all File objects in
+          that directory
+        * str or list of strs: each str will be treated as a file relative to the root,
+          and a list of File objects will be returned
+        * Builder: the builder's targets will be gathered and returned here. Whether the
+          returned item is a list of Files or a Dir depends on the builder.
+        """
+        pass  # TODO
+
+    def DependsFile(
+        self, builder: "Builder", sources: Union[DependsTypes, Iterable[DependsTypes]]
+    ) -> "File":
+        """Same as DependsFiles except only a single file is returned
+
+        Builders must return a single file or an error is raised.
+        """
+        pass  # TODO
+
+
+E = TypeVar("E", bound="Entry")
+
+
+class Entry(ABC):
+    """Represents a file or a directory, perhaps abstract
+
+    An abstract file/dir is one that does not yet have a location (path) on the filesystem
+
+    A concrete file/dir is one which has a path, but the file/dir may or may not yet exist.
 
     """
-    def __init__(self, outname: str, rel_path: str, build_dir_name: str):
-        self.path: Optional[Path] = None
-        self.outname = outname
+
+    def __init__(
+        self,
+        env: "Environment",
+        path: Union[str, Path, None] = None,
+        *,
+        rel_path: Optional[Path] = None,
+        build_dir_name: Optional[str] = None,
+    ):
+        self.env = env
+        self.path: Optional[Path] = Path(path) if path else None
         self.rel_path = rel_path
         self.build_dir_name = build_dir_name
 
+        if path is None:
+            assert self.rel_path and self.build_dir_name, (
+                "Abstract paths must have a rel_path " "and build_dir_name"
+            )
 
-class AbstractDirectory:
-    def __init__(self):
-        self.path: Optional[Path ]= None
+    def get_path(self) -> Path:
+        if self.path is None:
+            raise RuntimeError("This object is abstract and does not have a path")
+        return self.path
+
+    def derive(self: E, new_ext: str, build_dir_name: str) -> E:
+        """Create a derivative abstract file/dir from this file"""
+        if self.path is not None:
+            # Concrete path
+            new_rel_path = self.env.get_rel_path(self.path)
+        else:
+            assert self.rel_path is not None
+            new_rel_path = self.rel_path.with_suffix(new_ext)
+
+        return type(self)(
+            self.env,
+            rel_path=new_rel_path,
+            build_dir_name=build_dir_name,
+        )
+
+
+class File(Entry):
+    pass
+
+
+class Dir(Entry):
+    def __iter__(self) -> Iterator["File"]:
+
 
 BuilderSource = Union[str, "Builder", Path]
 BuilderSources = Union[BuilderSource, Iterable[BuilderSource]]
+
 
 class Builder(ABC):
     def __init__(self, env, sources: BuilderSources):
@@ -34,7 +141,8 @@ class Builder(ABC):
         self.dependencies, self.sources = self._process_sources(sources)
 
     def _process_sources(
-        self, items: BuilderSources,
+        self,
+        items: BuilderSources,
     ) -> Tuple[List["Builder"], List[Path]]:
         deps: List["Builder"] = []
         sources: List[Path] = []
