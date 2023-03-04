@@ -1,5 +1,17 @@
 # Scons517
 
+## Project Status
+This project is unmaintained. It is the result of exploring some ideas for an
+interface to SCons for building Python wheel distributions.
+
+If you're interested in using SCons to build Python Wheels, see
+[enscons](https://github.com/dholth/enscons).
+
+If you're interested in picking up this project or in using this name for a
+different project, contact me.
+
+## About
+
 Pep 517 compliant Python Distribution Wheel Builder
 
 This project's primary goal is to provide a simple and extensible set of tools for building
